@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ClienteB - Reproducción</title>
   <style>
+    /* Mantenemos los estilos originales con pequeñas mejoras */
     body, html {
       margin: 0;
       padding: 0;
@@ -34,6 +35,9 @@
       opacity: 0;
       transition: opacity 1s ease-in-out;
     }
+    .mediaItem.active {
+      opacity: 1;
+    }
     .mediaItem img, .mediaItem video {
       object-fit: cover;
       width: 100%;
@@ -56,7 +60,7 @@
       left: 0;
       width: 100%;
       height: auto;
-      animation: moveVertical 16s linear;
+      animation: moveVertical 25s linear;
     }
     @keyframes moveVertical {
       0% { transform: translateY(0); }
@@ -91,186 +95,203 @@
   <script>
     let mediaFiles = [];
     let currentIndex = 0;
-    
-    function fetchSelectedPhotos() {
-  const stored = localStorage.getItem('selectedPhotos');
-  if (stored) {
-    mediaFiles = JSON.parse(stored);
-    // Filtrar elementos inválidos
-    mediaFiles = mediaFiles.filter(item => item && item.url);
-    if (mediaFiles.length === 0) {
-      console.log('No se encontraron medios válidos en localStorage.');
-    }
-  } else {
-    console.log('No se encontró la clave "selectedPhotos" en localStorage.');
-  }
-}
+    let isPlaying = true;
 
-    // Se usa fileObj.type si existe, de lo contrario se intenta detectar por extensión
+    // 1. Mejorado: Sistema de carga de medios con validación
+    function fetchSelectedPhotos() {
+      try {
+        const stored = localStorage.getItem('selectedPhotos');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          mediaFiles = parsed.filter(item => 
+            item?.id && item?.url && item.url.startsWith('http')
+          );
+          console.log('Medios cargados:', mediaFiles);
+        }
+      } catch (error) {
+        console.error('Error cargando medios:', error);
+      }
+    }
+
+    // 2. Mejorado: Manejo de elementos multimedia con CORS
     function createMediaElement(fileObj) {
       const mediaItem = document.createElement('div');
-      mediaItem.classList.add('mediaItem');
-      const file = fileObj.url;
-      // Detecta video usando la propiedad 'type' si existe, o por extensión de la URL
-      const isVideo = (fileObj.type && fileObj.type.toLowerCase().includes('video')) ||
-                      ['mp4', 'avi', 'mov'].some(ext => file.toLowerCase().endsWith(`.${ext}`));
+      mediaItem.className = 'mediaItem';
       
+      const isVideo = fileObj.type?.includes('video') || 
+                     ['mp4', 'avi', 'mov'].some(ext => fileObj.url.toLowerCase().endsWith(`.${ext}`));
+
       if (isVideo) {
         const video = document.createElement('video');
-        video.src = file;
-        video.preload = "auto";
-        video.autoplay = true;
+        video.src = fileObj.url;
+        video.crossOrigin = "anonymous";
         video.muted = true;
-        video.loop = false;
         video.playsInline = true;
+        video.autoplay = true;
         video.controls = false;
-        mediaItem.appendChild(video);
+        video.style.objectFit = 'cover';
+        
+        video.addEventListener('loadeddata', () => {
+          mediaItem.classList.add('active');
+          video.play().catch(e => console.error('Error video:', e));
+        });
+        
+        video.addEventListener('ended', () => {
+          mediaItem.classList.remove('active');
+        });
 
-        // Intento inmediato de reproducción
-        video.play().catch(err => {
-          console.error("Error iniciando la reproducción:", err);
-        });
-        video.addEventListener('canplay', () => {
-          video.play().catch(err => console.error("Error on canplay:", err));
-        });
-        video.addEventListener('error', (e) => {
-          console.error("Error en la reproducción del video:", e);
-        });
-        mediaItem.style.opacity = 1;
+        mediaItem.appendChild(video);
       } else {
         const img = new Image();
-        img.src = file;
+        img.crossOrigin = "anonymous";
+        img.src = fileObj.url;
         img.onload = () => {
-          mediaItem.appendChild(img);
-          mediaItem.style.opacity = 1;
+          mediaItem.classList.add('active');
         };
-        img.onerror = () => console.error('Error carga imagen:', file);
+        img.onerror = () => console.error('Error carga imagen:', fileObj.url);
+        mediaItem.appendChild(img);
       }
+      
       return mediaItem;
     }
 
+    // 3. Mejorado: Detección de orientación con caché
+    const orientationCache = new Map();
     async function getOrientation(fileObj) {
       if (!fileObj?.url) return 'horizontal';
+      if (orientationCache.has(fileObj.id)) {
+        return orientationCache.get(fileObj.id);
+      }
+      
       try {
-        const img = await new Promise((resolve, reject) => {
-          const image = new Image();
-          image.onload = () => resolve(image);
-          image.onerror = reject;
-          image.src = fileObj.url;
+        const url = new URL(fileObj.url);
+        url.searchParams.set('w', '100');
+        url.searchParams.set('h', '100');
+        
+        const orientation = await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve(img.naturalHeight > img.naturalWidth ? 'vertical' : 'horizontal');
+          img.onerror = () => resolve('horizontal');
+          img.src = url.toString();
         });
-        return img.naturalHeight > img.naturalWidth ? 'vertical' : 'horizontal';
+        
+        orientationCache.set(fileObj.id, orientation);
+        return orientation;
       } catch {
         return 'horizontal';
       }
     }
 
-    async function renderVerticalPair(fileObj1, fileObj2) {
-      const mediaContainer = document.getElementById('mediaContainer');
-      mediaContainer.innerHTML = '';
+    // 4. Mejorado: Sistema de reproducción con gestión de estado
+    async function playNext() {
+      if (!mediaFiles.length || !isPlaying) return;
       
+      const fileObj = mediaFiles[currentIndex];
+      if (!fileObj) {
+        currentIndex = (currentIndex + 1) % mediaFiles.length;
+        return;
+      }
+
+      const orientation = await getOrientation(fileObj);
+      let nextIndex = currentIndex + 1;
+      let pairElement = null;
+
+      if (orientation === 'vertical' && nextIndex < mediaFiles.length) {
+        const nextFile = mediaFiles[nextIndex];
+        if (nextFile && (await getOrientation(nextFile)) === 'vertical') {
+          pairElement = createVerticalPair(fileObj, nextFile);
+          nextIndex++;
+        }
+      }
+
+      const mediaElement = pairElement || createMediaElement(fileObj);
+      const container = document.getElementById('mediaContainer');
+      
+      // Transición suave
+      container.appendChild(mediaElement);
+      setTimeout(() => {
+        if (container.children.length > 1) {
+          container.removeChild(container.children[0]);
+        }
+      }, 1000);
+
+      // Calcular tiempo de visualización
+      const isVideo = mediaElement.querySelector('video');
+      const displayTime = isVideo ? 
+        (mediaElement.querySelector('video').duration * 1000 || 8000) : 
+        8000;
+
+      await new Promise(resolve => setTimeout(resolve, displayTime + 1000));
+      
+      currentIndex = (nextIndex) % mediaFiles.length;
+      playNext();
+    }
+
+    function createVerticalPair(fileObj1, fileObj2) {
       const pairContainer = document.createElement('div');
-      pairContainer.classList.add('vertical-pair');
+      pairContainer.className = 'vertical-pair';
       
       const item1 = createMediaElement(fileObj1);
       const item2 = createMediaElement(fileObj2);
       
       pairContainer.appendChild(item1);
       pairContainer.appendChild(item2);
-      mediaContainer.appendChild(pairContainer);
-      
-      return new Promise(resolve => setTimeout(resolve, 25000));
+      return pairContainer;
     }
 
-    async function playMediaLoop() {
-      while (true) {
-        fetchSelectedPhotos();
-
-        if (!mediaFiles.length) {
-          await new Promise(r => setTimeout(r, 2000));
-          continue;
-        }
-        
-        mediaFiles = mediaFiles.filter(f => f?.url?.startsWith('http'));
-        
-        if (currentIndex >= mediaFiles.length) currentIndex = 0;
-        const fileObj = mediaFiles[currentIndex];
-        if (!fileObj?.url) {
-          currentIndex++;
-          continue;
-        }
-
-        const orientation = await getOrientation(fileObj);
-        let delay = 8000;
-
-        if (orientation === 'vertical' && currentIndex + 1 < mediaFiles.length) {
-          const nextFile = mediaFiles[currentIndex + 1];
-          if (nextFile?.url && await getOrientation(nextFile) === 'vertical') {
-            await renderVerticalPair(fileObj, nextFile);
-            currentIndex += 2;
-            continue;
+    // 5. Mejorado: Actualización en tiempo real
+    function setupLiveUpdates() {
+      window.addEventListener('storage', (event) => {
+        if (event.key === 'selectedPhotos') {
+          orientationCache.clear();
+          fetchSelectedPhotos();
+          if (!isPlaying) {
+            currentIndex = 0;
+            playNext();
           }
         }
-
-        const mediaItem = createMediaElement(fileObj);
-        const container = document.getElementById('mediaContainer');
-        container.innerHTML = '';
-        container.appendChild(mediaItem);
-        
-        const isVideo = (fileObj.type && fileObj.type.toLowerCase().includes('video')) ||
-                        ['mp4', 'avi', 'mov'].some(ext => fileObj.url.toLowerCase().endsWith(`.${ext}`));
-        if (isVideo) {
-          const video = mediaItem.querySelector('video');
-          let started = false;
-          video.addEventListener('playing', () => { started = true; }, { once: true });
-          
-          // Se espera hasta 30 segundos para que inicie el video
-          await Promise.race([
-            new Promise(resolve => video.addEventListener('playing', resolve, { once: true })),
-            new Promise(resolve => setTimeout(resolve, 30000))
-          ]);
-          
-          if (!started) {
-            console.warn("El video no inició en 30 segundos. Se omite este video.");
-          }
-          
-          await Promise.race([
-            new Promise(resolve => video.addEventListener('ended', resolve, { once: true })),
-            new Promise(resolve => setTimeout(resolve, 60000))
-          ]);
-        } else {
-          await new Promise(r => setTimeout(r, delay));
-        }
-        
-        mediaItem.style.opacity = 0;
-        await new Promise(r => setTimeout(r, 1000));
-        mediaItem.remove();
-        currentIndex++;
-      }
+      });
     }
 
-    function removeMedia(id) {
-      mediaFiles = mediaFiles.filter(item => item.id !== id);
-      localStorage.setItem('selectedPhotos', JSON.stringify(mediaFiles));
-      currentIndex = 0;
-    }
-
+    // 6. Mejorado: Sistema de reloj
     function updateClock() {
       const now = new Date();
+      const timeOptions = { hour: '2-digit', minute: '2-digit' };
+      const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      
       document.querySelector('#clock .time').textContent = 
-        now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        now.toLocaleTimeString('es-ES', timeOptions);
+      
       document.querySelector('#clock .date').textContent = 
-        now.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        now.toLocaleDateString('es-ES', dateOptions);
     }
 
+    // Inicialización
     window.onload = () => {
       fetchSelectedPhotos();
+      setupLiveUpdates();
       updateClock();
       setInterval(updateClock, 1000);
-      playMediaLoop();
+      
       document.addEventListener('dblclick', () => {
-        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen();
+        }
       });
+      
+      // Iniciar reproducción
+      playNext();
     };
+
+    // Manejo de errores global
+    window.addEventListener('error', (error) => {
+      console.error('Error global:', error);
+      isPlaying = false;
+      setTimeout(() => {
+        isPlaying = true;
+        playNext();
+      }, 5000);
+    });
   </script>
 </body>
 </html>
