@@ -8,7 +8,9 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.set('trust proxy', true);
+// Configurar trust proxy temprano para que sólo confíe en el primer proxy
+app.set('trust proxy', 1);
+console.log("Trust proxy is set to:", app.get('trust proxy'));
 
 app.use(
   helmet({
