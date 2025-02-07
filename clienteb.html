@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClienteB - Reproducción</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: black;
+      color: white;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+    #mediaContainer {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+    .mediaItem {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 1s ease-in-out;
+    }
+    .mediaItem img, .mediaItem video {
+      object-fit: cover;
+      width: 100%;
+      height: 100%;
+    }
+    .vertical-pair {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+    .vertical-pair .mediaItem {
+      position: relative;
+      width: 50%;
+      height: 100%;
+      overflow: hidden;
+    }
+    .vertical-pair .mediaItem img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: auto;
+      animation: moveVertical 16s linear;
+    }
+    @keyframes moveVertical {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(calc(-100% + 100vh)); }
+    }
+    #clock {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    #clock .time {
+      font-size: 80px;
+      font-weight: bold;
+    }
+    #clock .date {
+      font-size: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div id="mediaContainer"></div>
+  <div id="clock">
+    <div class="time" aria-live="polite"></div>
+    <div class="date" aria-live="polite"></div>
+  </div>
+  <script>
+    let mediaFiles = [];
+    let currentIndex = 0;
+    
+    function fetchSelectedPhotos() {
+      const stored = localStorage.getItem('selectedPhotos');
+      if (stored) {
+        mediaFiles = JSON.parse(stored);
+        console.log('Medios cargados:', mediaFiles);
+      }
+    }
+
+    // Se usa fileObj.type si existe, de lo contrario se intenta detectar por extensión
+    function createMediaElement(fileObj) {
+      const mediaItem = document.createElement('div');
+      mediaItem.classList.add('mediaItem');
+      const file = fileObj.url;
+      // Detecta video usando la propiedad 'type' si existe, o por extensión de la URL
+      const isVideo = (fileObj.type && fileObj.type.toLowerCase().includes('video')) ||
+                      ['mp4', 'avi', 'mov'].some(ext => file.toLowerCase().endsWith(`.${ext}`));
+      
+      if (isVideo) {
+        const video = document.createElement('video');
+        video.src = file;
+        video.preload = "auto";
+        video.autoplay = true;
+        video.muted = true;
+        video.loop = false;
+        video.playsInline = true;
+        video.controls = false;
+        mediaItem.appendChild(video);
+
+        // Intento inmediato de reproducción
+        video.play().catch(err => {
+          console.error("Error iniciando la reproducción:", err);
+        });
+        video.addEventListener('canplay', () => {
+          video.play().catch(err => console.error("Error on canplay:", err));
+        });
+        video.addEventListener('error', (e) => {
+          console.error("Error en la reproducción del video:", e);
+        });
+        mediaItem.style.opacity = 1;
+      } else {
+        const img = new Image();
+        img.src = file;
+        img.onload = () => {
+          mediaItem.appendChild(img);
+          mediaItem.style.opacity = 1;
+        };
+        img.onerror = () => console.error('Error carga imagen:', file);
+      }
+      return mediaItem;
+    }
+
+    async function getOrientation(fileObj) {
+      if (!fileObj?.url) return 'horizontal';
+      try {
+        const img = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = reject;
+          image.src = fileObj.url;
+        });
+        return img.naturalHeight > img.naturalWidth ? 'vertical' : 'horizontal';
+      } catch {
+        return 'horizontal';
+      }
+    }
+
+    async function renderVerticalPair(fileObj1, fileObj2) {
+      const mediaContainer = document.getElementById('mediaContainer');
+      mediaContainer.innerHTML = '';
+      
+      const pairContainer = document.createElement('div');
+      pairContainer.classList.add('vertical-pair');
+      
+      const item1 = createMediaElement(fileObj1);
+      const item2 = createMediaElement(fileObj2);
+      
+      pairContainer.appendChild(item1);
+      pairContainer.appendChild(item2);
+      mediaContainer.appendChild(pairContainer);
+      
+      return new Promise(resolve => setTimeout(resolve, 25000));
+    }
+
+    async function playMediaLoop() {
+      while (true) {
+        fetchSelectedPhotos();
+
+        if (!mediaFiles.length) {
+          await new Promise(r => setTimeout(r, 2000));
+          continue;
+        }
+        
+        mediaFiles = mediaFiles.filter(f => f?.url?.startsWith('http'));
+        
+        if (currentIndex >= mediaFiles.length) currentIndex = 0;
+        const fileObj = mediaFiles[currentIndex];
+        if (!fileObj?.url) {
+          currentIndex++;
+          continue;
+        }
+
+        const orientation = await getOrientation(fileObj);
+        let delay = 8000;
+
+        if (orientation === 'vertical' && currentIndex + 1 < mediaFiles.length) {
+          const nextFile = mediaFiles[currentIndex + 1];
+          if (nextFile?.url && await getOrientation(nextFile) === 'vertical') {
+            await renderVerticalPair(fileObj, nextFile);
+            currentIndex += 2;
+            continue;
+          }
+        }
+
+        const mediaItem = createMediaElement(fileObj);
+        const container = document.getElementById('mediaContainer');
+        container.innerHTML = '';
+        container.appendChild(mediaItem);
+        
+        const isVideo = (fileObj.type && fileObj.type.toLowerCase().includes('video')) ||
+                        ['mp4', 'avi', 'mov'].some(ext => fileObj.url.toLowerCase().endsWith(`.${ext}`));
+        if (isVideo) {
+          const video = mediaItem.querySelector('video');
+          let started = false;
+          video.addEventListener('playing', () => { started = true; }, { once: true });
+          
+          // Se espera hasta 30 segundos para que inicie el video
+          await Promise.race([
+            new Promise(resolve => video.addEventListener('playing', resolve, { once: true })),
+            new Promise(resolve => setTimeout(resolve, 30000))
+          ]);
+          
+          if (!started) {
+            console.warn("El video no inició en 30 segundos. Se omite este video.");
+          }
+          
+          await Promise.race([
+            new Promise(resolve => video.addEventListener('ended', resolve, { once: true })),
+            new Promise(resolve => setTimeout(resolve, 60000))
+          ]);
+        } else {
+          await new Promise(r => setTimeout(r, delay));
+        }
+        
+        mediaItem.style.opacity = 0;
+        await new Promise(r => setTimeout(r, 1000));
+        mediaItem.remove();
+        currentIndex++;
+      }
+    }
+
+    function removeMedia(id) {
+      mediaFiles = mediaFiles.filter(item => item.id !== id);
+      localStorage.setItem('selectedPhotos', JSON.stringify(mediaFiles));
+      currentIndex = 0;
+    }
+
+    function updateClock() {
+      const now = new Date();
+      document.querySelector('#clock .time').textContent = 
+        now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+      document.querySelector('#clock .date').textContent = 
+        now.toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    window.onload = () => {
+      fetchSelectedPhotos();
+      updateClock();
+      setInterval(updateClock, 1000);
+      playMediaLoop();
+      document.addEventListener('dblclick', () => {
+        if (!document.fullscreenElement) document.documentElement.requestFullscreen();
+      });
+    };
+  </script>
+</body>
+</html>
