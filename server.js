@@ -23,7 +23,7 @@ app.use(
           'https://accounts.google.com',
           "'unsafe-inline'"
         ],
-        imgSrc: ["'self'", 'data:', 'https://*.googleusercontent.com'],
+        imgSrc: ["'self'", 'data:', 'https://*.googleusercontent.com', 'https://lh3.googleusercontent.com'],
         // Agregamos mediaSrc para permitir videos desde dominios de Google
         mediaSrc: ["'self'", 'https://*.googleusercontent.com'],
         frameSrc: [
