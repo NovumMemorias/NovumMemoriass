@@ -93,12 +93,18 @@
     let currentIndex = 0;
     
     function fetchSelectedPhotos() {
-      const stored = localStorage.getItem('selectedPhotos');
-      if (stored) {
-        mediaFiles = JSON.parse(stored);
-        console.log('Medios cargados:', mediaFiles);
-      }
+  const stored = localStorage.getItem('selectedPhotos');
+  if (stored) {
+    mediaFiles = JSON.parse(stored);
+    // Filtrar elementos inválidos
+    mediaFiles = mediaFiles.filter(item => item && item.url);
+    if (mediaFiles.length === 0) {
+      console.log('No se encontraron medios válidos en localStorage.');
     }
+  } else {
+    console.log('No se encontró la clave "selectedPhotos" en localStorage.');
+  }
+}
 
     // Se usa fileObj.type si existe, de lo contrario se intenta detectar por extensión
     function createMediaElement(fileObj) {
