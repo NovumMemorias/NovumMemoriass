@@ -8,7 +8,6 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configurar trust proxy temprano para que sólo confíe en el primer proxy
 app.set('trust proxy', 1);
 console.log("Trust proxy is set to:", app.get('trust proxy'));
 
@@ -24,7 +23,6 @@ app.use(
           "'unsafe-inline'"
         ],
         imgSrc: ["'self'", 'data:', 'https://*.googleusercontent.com', 'https://lh3.googleusercontent.com'],
-        // Agregamos mediaSrc para permitir videos desde dominios de Google
         mediaSrc: ["'self'", 'https://*.googleusercontent.com'],
         frameSrc: [
           "'self'",
@@ -62,7 +60,7 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Endpoint para servir videos con soporte de Range Requests (para archivos locales, si se requiere)
+// Endpoint para servir videos con Range Requests (para archivos locales)
 app.get('/video/:name', (req, res) => {
   const videoPath = path.join(__dirname, req.params.name);
   fs.stat(videoPath, (err, stats) => {
@@ -95,6 +93,4 @@ app.get('/video/:name', (req, res) => {
   });
 });
 
-app.listen(PORT, () =>
-  console.log(`Servidor corriendo en http://localhost:${PORT}`)
-);
+app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));

@@ -8,14 +8,13 @@
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    /* Estilos generales */
+    /* (Se mantienen los estilos originales, sin cambios relevantes) */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
       padding: 20px;
       background-color: #f0f2f5;
     }
-    /* Header de administración (oculto hasta autenticarse) */
     .fixed-header {
       position: fixed;
       top: 0;
@@ -38,7 +37,6 @@
       background: #007bff;
       color: white;
     }
-    /* Botón extra para gestionar reproducción */
     #manageReproductionButton {
       background: #ffc107;
       color: black;
@@ -82,7 +80,6 @@
       font-size: 14px;
       z-index: 2000;
     }
-    /* Overlay de bienvenida */
     #welcomeOverlay {
       position: fixed;
       top: 0;
@@ -116,7 +113,6 @@
       color: white;
       font-size: 18px;
     }
-    /* Overlay de elección de modo de uso */
     #usageScreen {
       position: fixed;
       top: 0;
@@ -149,7 +145,6 @@
     #usageScreen .usageButton.secondary {
       background: #17a2b8;
     }
-    /* Overlay para gestionar reproducción (mostrar imágenes seleccionadas) */
     #manageOverlay {
       position: fixed;
       top: 0;
@@ -190,7 +185,6 @@
       color: white;
       cursor: pointer;
     }
-    /* Botón de eliminar en cada imagen */
     .deleteIcon {
       position: absolute;
       top: 5px;
@@ -208,14 +202,15 @@
   </style>
 </head>
 <body>
+
   <!-- Pantalla de bienvenida -->
   <div id="welcomeOverlay">
     <h1>Bienvenidos</h1>
     <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder a tu galería. Toca el botón para iniciar la autenticación.</p>
     <button class="welcomeButton" id="btnIniciar">Toca para comenzar</button>
   </div>
-  
-  <!-- Interfaz de administración (oculta hasta autenticarse) -->
+
+  <!-- Interfaz de administración -->
   <div class="fixed-header" id="header">
     <button class="button" id="authButton">Reautenticar</button>
     <button class="button" id="selectPhotosButton" disabled>Mostrar Fotos</button>
@@ -223,24 +218,24 @@
     <button class="button" id="manageReproductionButton" disabled>Gestionar reproducción</button>
     <div id="progressBar"></div>
   </div>
-  
+
   <div id="photosContainer"></div>
   <div id="message"></div>
-  
+
   <!-- Overlay de elección de modo de uso -->
   <div id="usageScreen">
     <h2>¿Cómo se usará este dispositivo?</h2>
     <button class="usageButton" id="btnAdministrar">Administrar fotos y videos</button>
     <button class="usageButton secondary" id="btnMarco">Usar como marco de fotos</button>
   </div>
-  
-  <!-- Overlay para gestionar reproducción: muestra fotos seleccionadas con opción de eliminación -->
+
+  <!-- Overlay para gestionar reproducción -->
   <div id="manageOverlay">
     <h2>Gestionar reproducción</h2>
     <div class="grid" id="manageGrid"></div>
     <button class="closeButton" id="closeManageOverlay">Cerrar</button>
   </div>
-  
+
   <script>
     // Función para mostrar mensajes
     function showMessage(text) {
@@ -262,7 +257,7 @@
     let selectedPhotos = new Set();
     let allFetchedPhotos = [];
 
-    // Función para obtener la selección ya guardada (array de objetos {id, url})
+    // Función para obtener la selección ya guardada
     function getStoredSelection() {
       const stored = localStorage.getItem('selectedPhotos');
       return stored ? JSON.parse(stored) : [];
@@ -300,7 +295,6 @@
             document.getElementById('selectPhotosButton').disabled = false;
             document.getElementById('manageReproductionButton').disabled = false;
             showMessage('¡Autenticación exitosa!');
-            // Oculta el overlay de bienvenida, muestra el header y la pantalla de uso
             document.getElementById('welcomeOverlay').style.display = 'none';
             document.getElementById('header').style.display = 'flex';
             showUsageScreen();
@@ -340,7 +334,6 @@
       document.getElementById('btnMarco').onclick = () => {
         console.log("Modo marco seleccionado");
         usageScreen.style.display = 'none';
-        // Redirige a clienteb.html en la misma pestaña
         window.location.href = 'clienteb.html';
       };
     }
@@ -380,7 +373,7 @@
         } while (nextPageToken && pageCount < 10);
         progressBar.style.width = '100%';
         allFetchedPhotos = photos;
-        // Filtra las fotos que ya están en la reproducción (almacenadas en localStorage)
+        // Filtra los ítems ya almacenados
         const stored = getStoredSelection();
         const selectedIds = new Set(stored.map(item => item.id));
         const available = photos.filter(photo => !selectedIds.has(photo.id));
@@ -413,7 +406,6 @@
           img.textContent = photo.filename || 'Sin nombre';
         }
         img.title = photo.filename || '';
-        // Al hacer clic se alterna la selección
         img.onclick = () => toggleSelection(img, photo.id);
         container.appendChild(img);
       });
@@ -432,28 +424,29 @@
       document.getElementById('saveSelectionButton').disabled = selectedPhotos.size === 0;
     }
 
-    // Guarda la selección en localStorage como array de objetos { id, url }
+    // Guarda la selección en localStorage y agrega la propiedad 'type'
     function saveSelectedPhotos() {
       if (!allFetchedPhotos.length) {
         showMessage('No hay fotos cargadas para guardar.');
         return;
       }
       const selected = allFetchedPhotos.filter(photo => selectedPhotos.has(photo.id))
-                                       .map(photo => ({
-                                         id: photo.id,
-                                         url: photo.baseUrl + '=w1920-h1080'
-                                       }));
+        .map(photo => ({
+          id: photo.id,
+          url: photo.baseUrl + (photo.mimeType && photo.mimeType.includes('video') ? '=dv' : '=w1920-h1080'),
+          type: photo.mimeType || 'image'
+        }));
       if (selected.length === 0) {
         showMessage('No se seleccionó ninguna foto.');
         return;
       }
       localStorage.setItem('selectedPhotos', JSON.stringify(selected));
       showMessage('Selección guardada. Puedes reproducirla en otro dispositivo.');
-      // Actualiza la lista de miniaturas, quitando las seleccionadas.
+      // Actualiza las miniaturas
       fetchPhotos();
     }
 
-    // Muestra el overlay para gestionar la reproducción (eliminar fotos de la lista actual)
+    // Overlay para gestionar reproducción
     function showManageOverlay() {
       const manageOverlay = document.getElementById('manageOverlay');
       const grid = document.getElementById('manageGrid');
@@ -471,13 +464,10 @@
           img.style.height = '150px';
           img.style.objectFit = 'cover';
           img.style.borderRadius = '8px';
-          // Botón para eliminar
           const btnDelete = document.createElement('button');
           btnDelete.textContent = '×';
           btnDelete.classList.add('deleteIcon');
-          btnDelete.onclick = () => {
-            removeFromReproduction(item.id);
-          };
+          btnDelete.onclick = () => { removeFromReproduction(item.id); };
           div.appendChild(img);
           div.appendChild(btnDelete);
           grid.appendChild(div);
@@ -486,27 +476,22 @@
       manageOverlay.style.display = 'flex';
     }
 
-    // Elimina un medio de la lista de reproducción (actualiza localStorage)
+    // Elimina un medio de la reproducción
     function removeFromReproduction(id) {
       let stored = getStoredSelection();
       stored = stored.filter(item => item.id !== id);
       localStorage.setItem('selectedPhotos', JSON.stringify(stored));
       showMessage('Foto eliminada de la reproducción.');
-      // Actualiza el overlay de gestión
       showManageOverlay();
-      // Vuelve a recargar las miniaturas disponibles
       fetchPhotos();
     }
 
-    // Inicialización de la gestión de reproducción: configura botón de gestión
     function initManageButton() {
       const btnManage = document.getElementById('manageReproductionButton');
-      btnManage.onclick = () => {
-        showManageOverlay();
-      };
+      btnManage.onclick = () => { showManageOverlay(); };
     }
 
-    // Inicialización al cargar la página
+    // Inicialización de la página
     window.onload = async () => {
       document.getElementById('header').style.display = 'none';
       try {
@@ -516,26 +501,13 @@
         console.error('Error de inicialización:', error);
         showMessage('Error crítico. Recarga la aplicación.');
       }
-      // Configura botones de la interfaz
       document.getElementById('authButton').onclick = iniciarAutenticacion;
       document.getElementById('selectPhotosButton').onclick = fetchPhotos;
       document.getElementById('saveSelectionButton').onclick = saveSelectedPhotos;
       initManageButton();
-      // Configura el botón de bienvenida
-      document.getElementById('btnIniciar').onclick = () => {
-        iniciarAutenticacion();
-      };
-      // Configura el botón de cerrar en el overlay de gestión
-      document.getElementById('closeManageOverlay').onclick = () => {
-        document.getElementById('manageOverlay').style.display = 'none';
-      };
+      document.getElementById('btnIniciar').onclick = () => { iniciarAutenticacion(); };
+      document.getElementById('closeManageOverlay').onclick = () => { document.getElementById('manageOverlay').style.display = 'none'; };
     };
   </script>
-  <!-- Overlay para gestión de reproducción -->
-  <div id="manageOverlay">
-    <h2>Gestionar reproducción</h2>
-    <div class="grid" id="manageGrid"></div>
-    <button class="closeButton" id="closeManageOverlay">Cerrar</button>
-  </div>
 </body>
 </html>
