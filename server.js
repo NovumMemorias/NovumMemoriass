@@ -6,8 +6,6 @@ const cors = require('cors');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
 app.set('trust proxy', 1);
 console.log("Trust proxy is set to:", app.get('trust proxy'));
 
@@ -93,4 +91,19 @@ app.get('/video/:name', (req, res) => {
   });
 });
 
-app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+// Integración con Socket.IO
+const http = require('http');
+const server = http.createServer(app);
+const socketIo = require('socket.io');
+const io = socketIo(server);
+
+io.on('connection', (socket) => {
+  console.log('Cliente conectado');
+  socket.on('updatePhotos', () => {
+    console.log('Actualización de fotos recibida, notificando a clientes...');
+    io.emit('refreshPhotos');
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));

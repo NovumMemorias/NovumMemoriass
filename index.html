@@ -6,6 +6,8 @@
   <title>Google Photos App - Configuración</title>
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Se agrega Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
   <style>
     /* Estilos globales */
     body {
@@ -36,7 +38,7 @@
       width: 100vw;
       height: 100vh;
       background: rgba(0,0,0,0.5);
-      display: none; /* Oculto por defecto */
+      display: none;
       align-items: center;
       justify-content: center;
       z-index: 4000;
@@ -85,7 +87,7 @@
       background: none;
       box-shadow: none;
       padding: 10px;
-      white-space: nowrap; /* Evita que el texto se divida en dos líneas */
+      white-space: nowrap;
     }
     .fixed-header .button {
       padding: 10px 20px;
@@ -123,7 +125,7 @@
     }
     /* Contenedor de fotos */
     #photosContainer {
-      margin-top: 80px; /* espacio para los botones */
+      margin-top: 80px;
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 10px;
@@ -233,7 +235,7 @@
       z-index: 6500;
       display: none;
       flex-direction: column;
-      padding: 5%; /* Ajusta el valor según necesites */
+      padding: 5%;
       overflow-y: auto;
     }
     #manageOverlay h2 {
@@ -244,8 +246,7 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 10px;
-      padding-right: 10%; /* Ajusta esto si el contenido se ve desbalanceado */
-
+      padding-right: 10%;
     }
     #manageOverlay .grid img {
       width: 100%;
@@ -255,17 +256,17 @@
       position: relative;
     }
     #manageOverlay .closeButton {
-  position: absolute;
-  top: 10px; /* Ajusta la distancia desde la parte superior */
-  right: 15%; /* Ajusta la distancia desde la derecha */
-  background: #dc3545; /* Rojo */
-  border: none;
-  padding: 10px 15px;
-  color: white;
-  border-radius: 5px;
-  cursor: pointer;
-  z-index: 10; /* Asegura que esté encima de otros elementos */
-}
+      position: absolute;
+      top: 10px;
+      right: 15%;
+      background: #dc3545;
+      border: none;
+      padding: 10px 15px;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 10;
+    }
     .deleteIcon {
       position: absolute;
       top: 5px;
@@ -295,7 +296,14 @@
       <!-- Se elimina la palabra "Menú" -->
       <h2>Acerca de</h2>
       <p>
-        Me llamo Nestor y estoy desarrollando esta idea hace un tiempo con ayuda de la IA para generar un marco de fotos digital que se pueda gestionar desde un celular. Lo que motivó esto es la pérdida de un ser querido y el querer recordarlo o tenerlo presente para que el tiempo no lo diluya. Tuve esta idea para llenar el vacío que dejan esos seres que ya no están con nosotros. Espero que lo disfruten como yo lo disfruto este camino totalmente nuevo y lleno de aprendizaje. Todos los derechos reservados 2025.
+        Me llamo Nestor y estoy desarrollando esta idea hace un tiempo 
+        con ayuda de la IA para generar un marco de fotos digital que se pueda 
+        gestionar desde un celular. Lo que motivó esto es la pérdida de un ser 
+        querido y el querer recordarlo o tenerlo presente para que el tiempo no 
+        lo diluya. Tuve esta idea para llenar el vacío que dejan esos seres que 
+        ya no están con nosotros. Espero que lo disfruten como yo lo disfruto 
+        este camino totalmente nuevo y lleno de aprendizaje. Todos los derechos 
+        reservados 2025.
       </p>
     </div>
   </div>
@@ -303,7 +311,8 @@
   <!-- Pantalla de bienvenida -->
   <div id="welcomeOverlay">
     <h1>Bienvenidos</h1>
-    <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder a tu galería. Toca el botón para iniciar la autenticación.</p>
+    <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder 
+    a tu galería. Toca el botón para iniciar la autenticación.</p>
     <button class="welcomeButton" id="btnIniciar">Toca para comenzar</button>
   </div>
   
@@ -317,6 +326,7 @@
   <div class="loader" id="loader"></div>
   
   <div id="photosContainer"></div>
+  
   <div id="message"></div>
   
   <!-- Overlay de elección de modo de uso -->
@@ -334,7 +344,10 @@
   </div>
   
   <script>
-    // Función para mostrar mensajes 
+    // Se crea la instancia de Socket.IO
+    const socket = io();
+
+    // Función para mostrar mensajes
     function showMessage(text) {
       console.log("Mensaje:", text);
       const messageDiv = document.getElementById('message');
@@ -342,7 +355,7 @@
       setTimeout(() => messageDiv.textContent = '', 5000);
     }
     
-    // Configuración de la app 
+    // Configuración de la app
     const config = {
       CLIENT_ID: '398620721557-cc1g475hejmglorrf7v2aa61c4btod9g.apps.googleusercontent.com',
       API_KEY: 'AIzaSyCcgAXaMxPnwPjqbWYpWFvDtfohrE6fRHI',
@@ -354,13 +367,13 @@
     let selectedPhotos = new Set();
     let allFetchedPhotos = [];
     
-    // Función para obtener la selección ya guardada 
+    // Función para obtener la selección ya guardada
     function getStoredSelection() {
       const stored = localStorage.getItem('selectedPhotos');
       return stored ? JSON.parse(stored) : [];
     }
     
-    // Inicializa GAPI 
+    // Inicializa GAPI
     async function gapiLoaded() {
       try {
         await new Promise((resolve, reject) => {
@@ -381,7 +394,7 @@
       }
     }
     
-    // Inicializa el cliente OAuth2 
+    // Inicializa el cliente OAuth2
     function gisLoaded() {
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: config.CLIENT_ID,
@@ -410,7 +423,7 @@
       });
     }
     
-    // Función para iniciar autenticación 
+    // Función para iniciar autenticación
     function iniciarAutenticacion() {
       if (!tokenClient) {
         showMessage('Sistema no inicializado. Recarga la página.');
@@ -426,11 +439,12 @@
       overlay.style.display = overlay.classList.contains('active') ? 'flex' : 'none';
     }
     
-    // Muestra el overlay de elección de modo de uso 
+    // Muestra el overlay de elección de modo de uso
     function showUsageScreen() {
       console.log("Mostrando pantalla de uso");
       const usageScreen = document.getElementById('usageScreen');
       usageScreen.style.display = 'flex';
+      
       document.getElementById('btnAdministrar').addEventListener('click', () => {
         console.log("Modo administrar seleccionado");
         usageScreen.style.display = 'none';
@@ -444,7 +458,7 @@
       });
     }
     
-    // Función para obtener fotos desde Google Photos 
+    // Función para obtener fotos desde Google Photos
     async function fetchPhotos() {
       if (!accessToken) {
         showMessage('No hay token de acceso. Autentícate primero.');
@@ -454,7 +468,6 @@
       const container = document.getElementById('photosContainer');
       try {
         container.innerHTML = '';
-        // Mostrar la rueda de carga centrada
         loader.style.display = 'block';
         let photos = [];
         let nextPageToken = null;
@@ -475,10 +488,9 @@
           nextPageToken = data.nextPageToken;
           pageCount++;
         } while (nextPageToken && pageCount < 10);
-        // Ocultar la rueda de carga al finalizar
         loader.style.display = 'none';
         allFetchedPhotos = photos;
-        // Filtrar los ítems ya almacenados 
+        // Filtrar los ítems ya almacenados
         const stored = getStoredSelection();
         const selectedIds = new Set(stored.map(item => item.id));
         const available = photos.filter(photo => !selectedIds.has(photo.id));
@@ -490,7 +502,7 @@
       }
     }
     
-    // Muestra las fotos en pantalla 
+    // Muestra las fotos en pantalla
     function displayPhotos(photos) {
       const container = document.getElementById('photosContainer');
       container.innerHTML = '';
@@ -500,7 +512,6 @@
       }
       photos.forEach(photo => {
         const img = document.createElement('img');
-        // Usar photo.baseUrl o, si no existe, photo.url
         if (photo.baseUrl || photo.url) {
           img.src = (photo.baseUrl || photo.url) + '=w150-h150';
         } else {
@@ -515,7 +526,7 @@
       });
     }
     
-    // Alterna la selección de una foto 
+    // Alterna la selección de una foto
     function toggleSelection(img, photoId) {
       const isSelected = img.hasAttribute('selected');
       if (isSelected) {
@@ -528,7 +539,7 @@
       document.getElementById('saveSelectionButton').disabled = selectedPhotos.size === 0;
     }
     
-    // Guarda la selección en localStorage y agrega la propiedad 'type' 
+    // Guarda la selección en localStorage y agrega la propiedad 'type'
     function saveSelectedPhotos() {
       if (!allFetchedPhotos.length) {
         showMessage('No hay fotos cargadas para guardar.');
@@ -546,11 +557,13 @@
       }
       localStorage.setItem('selectedPhotos', JSON.stringify(selected));
       showMessage('Selección guardada. Puedes reproducirla en otro dispositivo.');
-      // Actualiza las miniaturas 
+      // Notificar a clienteb mediante WebSocket
+      socket.emit('updatePhotos');
+      // Actualiza las miniaturas
       fetchPhotos();
     }
     
-    // Overlay para gestionar reproducción 
+    // Overlay para gestionar reproducción
     function showManageOverlay() {
       const manageOverlay = document.getElementById('manageOverlay');
       const grid = document.getElementById('manageGrid');
@@ -580,12 +593,14 @@
       manageOverlay.style.display = 'flex';
     }
     
-    // Elimina un medio de la reproducción 
+    // Elimina un medio de la reproducción
     function removeFromReproduction(id) {
       let stored = getStoredSelection();
       stored = stored.filter(item => item.id !== id);
       localStorage.setItem('selectedPhotos', JSON.stringify(stored));
       showMessage('Foto eliminada de la reproducción.');
+      // Notificar a clienteb mediante WebSocket
+      socket.emit('updatePhotos');
       showManageOverlay();
       fetchPhotos();
     }
@@ -599,19 +614,16 @@
     window.addEventListener('load', async () => {
       // Ocultar cabecera inicialmente
       document.getElementById('header').style.display = 'none';
-      
-      // Asignar event listeners a elementos que antes usaban atributos inline
+      // Asignar event listeners
       document.getElementById('menuToggle').addEventListener('click', toggleMenuOverlay);
       document.getElementById('menuCloseButton').addEventListener('click', toggleMenuOverlay);
       document.getElementById('authButtonOverlay').addEventListener('click', iniciarAutenticacion);
       document.getElementById('btnIniciar').addEventListener('click', iniciarAutenticacion);
       document.getElementById('saveSelectionButton').addEventListener('click', saveSelectedPhotos);
-      // Event listener para cerrar el overlay de gestionar reproducción
       document.getElementById('closeManageOverlay').addEventListener('click', () => {
         document.getElementById('manageOverlay').style.display = 'none';
       });
       initManageButton();
-      
       try {
         await gapiLoaded();
         gisLoaded();
@@ -620,6 +632,64 @@
         showMessage('Error crítico. Recarga la aplicación.');
       }
     });
+
+    // Verificación periódica de cambios en localStorage (cada 5 segundos)
+    setInterval(() => {
+      const stored = localStorage.getItem('selectedPhotos');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (JSON.stringify(parsed) !== JSON.stringify(mediaFiles)) {
+          console.log("Nuevas imágenes detectadas, actualizando...");
+          mediaFiles = parsed;
+          currentIndex = 0;
+          playNext();
+        }
+      }
+    }, 5000);
+
+    // Escuchar cambios en localStorage para sincronizar pestañas
+    window.addEventListener('storage', (event) => {
+      if (event.key === 'selectedPhotos') {
+        console.log("Cambio detectado en localStorage, actualizando...");
+        mediaFiles = JSON.parse(event.newValue);
+        currentIndex = 0;
+        playNext();
+      }
+    });
+
+    // Escuchar notificaciones vía WebSockets
+    socket.on('refreshPhotos', () => {
+      console.log("Nuevos archivos detectados desde WebSockets, actualizando...");
+      fetchSelectedPhotos();
+      currentIndex = 0;
+      playNext();
+    });
+
+    window.onload = () => {
+      fetchSelectedPhotos();
+      playNext();
+      updateClock();
+      setInterval(updateClock, 1000);
+      document.addEventListener('dblclick', toggleFullScreen);
+    };
+
+    function updateClock() {
+      const now = new Date();
+      const timeOptions = { hour: '2-digit', minute: '2-digit' };
+      const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      document.querySelector('#clock .time').textContent = now.toLocaleTimeString('es-ES', timeOptions);
+      document.querySelector('#clock .date').textContent = now.toLocaleDateString('es-ES', dateOptions);
+    }
+
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.error('Error al activar pantalla completa:', err);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    }
   </script>
 </body>
 </html>
