@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,6 +16,7 @@
       font-family: Arial, sans-serif;
       overflow: hidden;
     }
+
     #mediaContainer {
       position: relative;
       width: 100vw;
@@ -24,6 +26,7 @@
       align-items: center;
       overflow: hidden;
     }
+
     .mediaItem {
       position: absolute;
       width: 100%;
@@ -34,14 +37,17 @@
       opacity: 0;
       transition: opacity 1000ms ease-in-out;
     }
+
     .mediaItem.active {
       opacity: 1;
     }
+
     .mediaItem img, .mediaItem video {
       object-fit: cover;
       width: 100%;
       height: 100%;
     }
+
     #blackOverlay {
       position: fixed;
       top: 0;
@@ -53,12 +59,41 @@
       transition: opacity 1000ms ease-in-out;
       pointer-events: none;
     }
+
+    /* Estilos del reloj */
+    #clock {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2000;
+      text-align: center;
+      color: white;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    #clock .time {
+      font-size: 80px;
+      font-weight: bold;
+    }
+
+    #clock .date {
+      font-size: 24px;
+    }
   </style>
 </head>
+
 <body>
+
   <div id="mediaContainer"></div>
   <div id="blackOverlay"></div>
-  
+
+  <!-- Contenedor del reloj -->
+  <div id="clock">
+    <div class="time" aria-live="polite"></div>
+    <div class="date" aria-live="polite"></div>
+  </div>
+
   <script>
     let mediaFiles = [];
     let currentIndex = 0;
@@ -80,9 +115,9 @@
     function createMediaElement(fileObj) {
       const mediaItem = document.createElement('div');
       mediaItem.className = 'mediaItem';
-      
+
       const isVideo = fileObj.type.includes('video') || fileObj.url.includes('=dv');
-      
+
       if (isVideo) {
         const video = document.createElement('video');
         video.src = fileObj.url;
@@ -91,7 +126,7 @@
         video.autoplay = true;
         video.controls = false;
         video.style.objectFit = 'cover';
-        
+
         video.addEventListener('loadeddata', () => {
           mediaItem.classList.add('active');
           video.play().catch(e => console.error('Error video:', e));
@@ -123,22 +158,22 @@
         currentIndex = (currentIndex + 1) % mediaFiles.length;
         return;
       }
-      
+
       fadeToBlack(() => {
         const mediaElement = createMediaElement(fileObj);
         const container = document.getElementById('mediaContainer');
-        
+
         if (container.firstChild) {
           const oldElement = container.firstChild;
           container.removeChild(oldElement);
         }
-        
+
         container.appendChild(mediaElement);
         mediaElement.classList.add('active');
-        
+
         const videoElem = mediaElement.querySelector('video');
         const displayTime = videoElem ? (videoElem.duration * 1000 || 8000) : 8000;
-        
+
         setTimeout(() => {
           currentIndex = (currentIndex + 1) % mediaFiles.length;
           playNext();
@@ -156,11 +191,23 @@
       }
     }
 
+    function updateClock() {
+      const now = new Date();
+      const timeOptions = { hour: '2-digit', minute: '2-digit' };
+      const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+
+      document.querySelector('#clock .time').textContent = now.toLocaleTimeString('es-ES', timeOptions);
+      document.querySelector('#clock .date').textContent = now.toLocaleDateString('es-ES', dateOptions);
+    }
+
     window.onload = () => {
       fetchSelectedPhotos();
       playNext();
+      updateClock();
+      setInterval(updateClock, 1000);
       document.addEventListener('dblclick', toggleFullScreen);
     };
   </script>
+
 </body>
 </html>
