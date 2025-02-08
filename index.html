@@ -7,28 +7,86 @@
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    /* Estilos originales */
+    /* Estilos globales */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
       padding: 20px;
       background-color: #f0f2f5;
     }
-    .fixed-header {
+    /* Botón para abrir el menú (hamburguesa) */
+    #menuToggle {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 10px;
+      cursor: pointer;
+      z-index: 5000;
+      font-size: 20px;
+    }
+    /* Overlay completo para el menú */
+    #menuOverlay {
       position: fixed;
       top: 0;
       left: 0;
-      right: 0;
-      background: white;
-      padding: 15px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      z-index: 1000;
-      display: flex;  /* Se muestra como flex para alinear correctamente */
-      flex-wrap: wrap;
-      gap: 10px;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0,0,0,0.5);
+      display: none; /* Oculto por defecto */
       align-items: center;
+      justify-content: center;
+      z-index: 4000;
     }
-    .button {
+    /* Contenedor interno del menú, centrado y con ancho máximo de 300px */
+    .menuContainer {
+      background: #444;
+      max-width: 300px;
+      width: 100%;
+      padding: 20px;
+      border-radius: 5px;
+      color: white;
+      box-sizing: border-box;
+    }
+    /* Botón para cerrar el menú */
+    #menuOverlay .closeButton {
+      background: #dc3545;
+      border: none;
+      padding: 10px 15px;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+    /* Botón Reautenticar (tamaño normal) */
+    #authButtonOverlay {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 5px;
+      background: #007bff;
+      color: white;
+      margin-bottom: 20px;
+      cursor: pointer;
+    }
+    /* Cabecera: contiene los botones "Guardar selección" y "Gestionar reproducción", centrados */
+    .fixed-header {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3000;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      background: none;
+      box-shadow: none;
+      padding: 10px;
+    }
+    .fixed-header .button {
       padding: 10px 20px;
       border: none;
       border-radius: 20px;
@@ -40,12 +98,15 @@
       background: #ffc107;
       color: black;
     }
-    /* La antigua barra de progreso se oculta (ya no se usará) */
     #progressBar {
       display: none;
     }
-    /* Nueva rueda de carga (loader) */
+    /* Loader global: centrado en la pantalla */
     .loader {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       display: none;
       border: 4px solid rgba(0, 0, 0, 0.1);
       border-top: 4px solid #007bff;
@@ -53,15 +114,15 @@
       width: 30px;
       height: 30px;
       animation: spin 1s linear infinite;
-      margin-left: 10px;
+      z-index: 5000;
     }
     @keyframes spin {
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
-    /* Resto de estilos originales */
+    /* Contenedor de fotos */
     #photosContainer {
-      margin-top: 120px;
+      margin-top: 80px; /* espacio para los botones */
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 10px;
@@ -79,6 +140,7 @@
       border: 3px solid #007bff;
       transform: scale(0.95);
     }
+    /* Mensajes */
     #message {
       position: fixed;
       bottom: 10px;
@@ -89,8 +151,9 @@
       padding: 10px 20px;
       border-radius: 5px;
       font-size: 14px;
-      z-index: 2000;
+      z-index: 5000;
     }
+    /* Pantalla de bienvenida */
     #welcomeOverlay {
       position: fixed;
       top: 0;
@@ -99,7 +162,7 @@
       height: 100vh;
       background: rgba(0,0,0,0.85);
       color: white;
-      z-index: 3000;
+      z-index: 6000;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -124,6 +187,7 @@
       color: white;
       font-size: 18px;
     }
+    /* Overlay de elección de modo de uso */
     #usageScreen {
       position: fixed;
       top: 0;
@@ -132,7 +196,7 @@
       height: 100vh;
       background: rgba(0,0,0,0.85);
       color: white;
-      z-index: 3000;
+      z-index: 6000;
       display: none;
       flex-direction: column;
       justify-content: center;
@@ -156,6 +220,7 @@
     #usageScreen .usageButton.secondary {
       background: #17a2b8;
     }
+    /* Overlay para gestionar reproducción */
     #manageOverlay {
       position: fixed;
       top: 0;
@@ -164,7 +229,7 @@
       height: 100vh;
       background: rgba(0,0,0,0.9);
       color: white;
-      z-index: 3500;
+      z-index: 6500;
       display: none;
       flex-direction: column;
       padding: 20px;
@@ -213,28 +278,38 @@
   </style>
 </head>
 <body>
+  <!-- Botón para abrir el menú (hamburguesa) -->
+  <div id="menuToggle">☰</div>
+  
+  <!-- Overlay del menú -->
+  <div id="menuOverlay">
+    <div class="menuContainer">
+      <button class="closeButton" id="menuCloseButton">Cerrar</button>
+      <!-- Botón Reautenticar (tamaño normal) -->
+      <button id="authButtonOverlay">Reautenticar</button>
+      <!-- Se elimina la palabra "Menú" -->
+      <h2>Acerca de</h2>
+      <p>
+        Me llamo Nestor y estoy desarrollando esta idea hace un tiempo con ayuda de la IA para generar un marco de fotos digital que se pueda gestionar desde un celular. Lo que motivó esto es la pérdida de un ser querido y el querer recordarlo o tenerlo presente para que el tiempo no lo diluya. Tuve esta idea para llenar el vacío que dejan esos seres que ya no están con nosotros. Espero que lo disfruten como yo lo disfruto este camino totalmente nuevo y lleno de aprendizaje. Todos los derechos reservados 2025.
+      </p>
+    </div>
+  </div>
+  
   <!-- Pantalla de bienvenida -->
   <div id="welcomeOverlay">
     <h1>Bienvenidos</h1>
-    <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder 
-      a tu galería. Toca el botón para iniciar la autenticación.</p>
-    <button class="welcomeButton" id="btnIniciar">Toca para 
-      comenzar</button>
+    <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder a tu galería. Toca el botón para iniciar la autenticación.</p>
+    <button class="welcomeButton" id="btnIniciar">Toca para comenzar</button>
   </div>
   
-  <!-- Interfaz de administración -->
+  <!-- Cabecera: botones "Guardar selección" y "Gestionar reproducción" -->
   <div class="fixed-header" id="header">
-    <button class="button" id="authButton">Reautenticar</button>
-    <button class="button" id="selectPhotosButton" disabled>Mostrar 
-      Fotos</button>
-    <button class="button" id="saveSelectionButton" disabled>Guardar 
-      selección</button>
-    <button class="button" id="manageReproductionButton" 
-      disabled>Gestionar reproducción</button>
-    <div id="progressBar"></div>
-    <!-- Aquí se encuentra la rueda de carga -->
-    <div class="loader" id="loader"></div>
+    <button class="button" id="saveSelectionButton" disabled>Guardar selección</button>
+    <button class="button" id="manageReproductionButton" disabled>Gestionar reproducción</button>
   </div>
+  
+  <!-- Loader global (centrado en pantalla) -->
+  <div class="loader" id="loader"></div>
   
   <div id="photosContainer"></div>
   <div id="message"></div>
@@ -242,10 +317,8 @@
   <!-- Overlay de elección de modo de uso -->
   <div id="usageScreen">
     <h2>¿Cómo se usará este dispositivo?</h2>
-    <button class="usageButton" id="btnAdministrar">Administrar fotos y 
-      videos</button>
-    <button class="usageButton secondary" id="btnMarco">Usar como marco 
-      de fotos</button>
+    <button class="usageButton" id="btnAdministrar">Administrar fotos y videos</button>
+    <button class="usageButton secondary" id="btnMarco">Usar como marco de fotos</button>
   </div>
   
   <!-- Overlay para gestionar reproducción -->
@@ -311,7 +384,7 @@
         callback: (tokenResponse) => {
           if (tokenResponse?.access_token) {
             accessToken = tokenResponse.access_token;
-            document.getElementById('selectPhotosButton').disabled = false;
+            // Habilitar botones de gestión
             document.getElementById('manageReproductionButton').disabled = false;
             showMessage('¡Autenticación exitosa!');
             document.getElementById('welcomeOverlay').style.display = 'none';
@@ -341,20 +414,29 @@
       tokenClient.requestAccessToken({ prompt: 'select_account' });
     }
     
+    // Función para alternar el menú overlay
+    function toggleMenuOverlay() {
+      const overlay = document.getElementById('menuOverlay');
+      overlay.classList.toggle('active');
+      overlay.style.display = overlay.classList.contains('active') ? 'flex' : 'none';
+    }
+    
     // Muestra el overlay de elección de modo de uso 
     function showUsageScreen() {
       console.log("Mostrando pantalla de uso");
       const usageScreen = document.getElementById('usageScreen');
       usageScreen.style.display = 'flex';
-      document.getElementById('btnAdministrar').onclick = () => {
+      document.getElementById('btnAdministrar').addEventListener('click', () => {
         console.log("Modo administrar seleccionado");
         usageScreen.style.display = 'none';
-      };
-      document.getElementById('btnMarco').onclick = () => {
+        // Cargar automáticamente las fotos al seleccionar administrar
+        fetchPhotos();
+      });
+      document.getElementById('btnMarco').addEventListener('click', () => {
         console.log("Modo marco seleccionado");
         usageScreen.style.display = 'none';
         window.location.href = 'clienteb.html';
-      };
+      });
     }
     
     // Función para obtener fotos desde Google Photos 
@@ -365,12 +447,10 @@
       }
       const loader = document.getElementById('loader');
       const container = document.getElementById('photosContainer');
-      const button = document.getElementById('selectPhotosButton');
       try {
-        button.disabled = true;
         container.innerHTML = '';
-        // Se muestra la rueda de carga
-        loader.style.display = 'inline-block';
+        // Mostrar la rueda de carga centrada
+        loader.style.display = 'block';
         let photos = [];
         let nextPageToken = null;
         let pageCount = 0;
@@ -390,10 +470,10 @@
           nextPageToken = data.nextPageToken;
           pageCount++;
         } while (nextPageToken && pageCount < 10);
-        // Oculta la rueda de carga al finalizar la carga
+        // Ocultar la rueda de carga al finalizar
         loader.style.display = 'none';
         allFetchedPhotos = photos;
-        // Filtra los ítems ya almacenados 
+        // Filtrar los ítems ya almacenados 
         const stored = getStoredSelection();
         const selectedIds = new Set(stored.map(item => item.id));
         const available = photos.filter(photo => !selectedIds.has(photo.id));
@@ -402,8 +482,6 @@
         console.error('Error al cargar fotos:', error);
         showMessage('Error al cargar fotos. Intente nuevamente.');
         loader.style.display = 'none';
-      } finally {
-        button.disabled = false;
       }
     }
     
@@ -417,8 +495,9 @@
       }
       photos.forEach(photo => {
         const img = document.createElement('img');
-        if (photo.baseUrl) {
-          img.src = photo.baseUrl + '=w150-h150';
+        // Usar photo.baseUrl o, si no existe, photo.url
+        if (photo.baseUrl || photo.url) {
+          img.src = (photo.baseUrl || photo.url) + '=w150-h150';
         } else {
           img.alt = photo.filename || 'Foto sin URL';
           img.style.background = '#ccc';
@@ -426,7 +505,7 @@
           img.textContent = photo.filename || 'Sin nombre';
         }
         img.title = photo.filename || '';
-        img.onclick = () => toggleSelection(img, photo.id);
+        img.addEventListener('click', () => toggleSelection(img, photo.id));
         container.appendChild(img);
       });
     }
@@ -453,7 +532,7 @@
       const selected = allFetchedPhotos.filter(photo => selectedPhotos.has(photo.id))
         .map(photo => ({
           id: photo.id,
-          url: photo.baseUrl + (photo.mimeType && photo.mimeType.includes('video') ? '=dv' : '=w1920-h1080'),
+          url: (photo.baseUrl || photo.url) + (photo.mimeType && photo.mimeType.includes('video') ? '=dv' : '=w1920-h1080'),
           type: photo.mimeType || 'image'
         }));
       if (selected.length === 0) {
@@ -487,7 +566,7 @@
           const btnDelete = document.createElement('button');
           btnDelete.textContent = '×';
           btnDelete.classList.add('deleteIcon');
-          btnDelete.onclick = () => { removeFromReproduction(item.id); };
+          btnDelete.addEventListener('click', () => { removeFromReproduction(item.id); });
           div.appendChild(img);
           div.appendChild(btnDelete);
           grid.appendChild(div);
@@ -508,12 +587,26 @@
     
     function initManageButton() {
       const btnManage = document.getElementById('manageReproductionButton');
-      btnManage.onclick = () => { showManageOverlay(); };
+      btnManage.addEventListener('click', () => { showManageOverlay(); });
     }
     
-    // Inicialización de la página 
-    window.onload = async () => {
+    // Asignación de event listeners cuando la página carga
+    window.addEventListener('load', async () => {
+      // Ocultar cabecera inicialmente
       document.getElementById('header').style.display = 'none';
+      
+      // Asignar event listeners a elementos que antes usaban atributos inline
+      document.getElementById('menuToggle').addEventListener('click', toggleMenuOverlay);
+      document.getElementById('menuCloseButton').addEventListener('click', toggleMenuOverlay);
+      document.getElementById('authButtonOverlay').addEventListener('click', iniciarAutenticacion);
+      document.getElementById('btnIniciar').addEventListener('click', iniciarAutenticacion);
+      document.getElementById('saveSelectionButton').addEventListener('click', saveSelectedPhotos);
+      // Event listener para cerrar el overlay de gestionar reproducción
+      document.getElementById('closeManageOverlay').addEventListener('click', () => {
+        document.getElementById('manageOverlay').style.display = 'none';
+      });
+      initManageButton();
+      
       try {
         await gapiLoaded();
         gisLoaded();
@@ -521,13 +614,7 @@
         console.error('Error de inicialización:', error);
         showMessage('Error crítico. Recarga la aplicación.');
       }
-      document.getElementById('authButton').onclick = iniciarAutenticacion;
-      document.getElementById('selectPhotosButton').onclick = fetchPhotos;
-      document.getElementById('saveSelectionButton').onclick = saveSelectedPhotos;
-      initManageButton();
-      document.getElementById('btnIniciar').onclick = () => { iniciarAutenticacion(); };
-      document.getElementById('closeManageOverlay').onclick = () => { document.getElementById('manageOverlay').style.display = 'none'; };
-    };
+    });
   </script>
 </body>
 </html>

@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ClienteB - Reproducción</title>
   <style>
-    /* Estilos originales */
     body, html {
       margin: 0;
       padding: 0;
@@ -33,7 +32,7 @@
       justify-content: center;
       align-items: center;
       opacity: 0;
-      transition: opacity 500ms ease-in-out;
+      transition: opacity 1000ms ease-in-out;
     }
     .mediaItem.active {
       opacity: 1;
@@ -43,41 +42,34 @@
       width: 100%;
       height: 100%;
     }
-    /* (El resto de los estilos se mantienen igual) */
-    #clock {
+    #blackOverlay {
       position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 2000;
-      text-align: center;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: black;
+      opacity: 0;
+      transition: opacity 1000ms ease-in-out;
+      pointer-events: none;
     }
-    #clock .time { font-size: 80px; font-weight: bold; }
-    #clock .date { font-size: 24px; }
   </style>
 </head>
 <body>
   <div id="mediaContainer"></div>
-  <div id="clock">
-    <div class="time" aria-live="polite"></div>
-    <div class="date" aria-live="polite"></div>
-  </div>
+  <div id="blackOverlay"></div>
+  
   <script>
     let mediaFiles = [];
     let currentIndex = 0;
     let isPlaying = true;
-    const orientationCache = new Map();
 
-    // Carga los medios guardados en localStorage
     function fetchSelectedPhotos() {
       try {
         const stored = localStorage.getItem('selectedPhotos');
         if (stored) {
           const parsed = JSON.parse(stored);
-          mediaFiles = parsed.filter(item =>
-            item?.id && item?.url && item.url.startsWith('http')
-          );
+          mediaFiles = parsed.filter(item => item?.id && item?.url && item.url.startsWith('http'));
           console.log('Medios cargados:', mediaFiles);
         }
       } catch (error) {
@@ -85,14 +77,12 @@
       }
     }
 
-    // Crea el elemento multimedia detectando videos (se asume que si la URL contiene '=dv' o el type es 'video', es un video)
     function createMediaElement(fileObj) {
       const mediaItem = document.createElement('div');
       mediaItem.className = 'mediaItem';
-
-      const isVideo = (fileObj.type && fileObj.type.includes('video')) ||
-                      (fileObj.url && fileObj.url.includes('=dv'));
-
+      
+      const isVideo = fileObj.type.includes('video') || fileObj.url.includes('=dv');
+      
       if (isVideo) {
         const video = document.createElement('video');
         video.src = fileObj.url;
@@ -101,145 +91,76 @@
         video.autoplay = true;
         video.controls = false;
         video.style.objectFit = 'cover';
-
+        
         video.addEventListener('loadeddata', () => {
-          // Cuando ya está listo, se activa la opacidad
           mediaItem.classList.add('active');
           video.play().catch(e => console.error('Error video:', e));
-          console.log('Video duration:', video.duration);
         });
-        video.addEventListener('ended', () => {
-          mediaItem.classList.remove('active');
-        });
-        video.onerror = (e) => {
-          console.error('Error cargando video:', fileObj.url, e);
-        };
+
         mediaItem.appendChild(video);
       } else {
         const img = new Image();
         img.src = fileObj.url;
-        img.onload = () => { mediaItem.classList.add('active'); };
-        img.onerror = () => console.error('Error carga imagen:', fileObj.url);
+        img.onload = () => mediaItem.classList.add('active');
         mediaItem.appendChild(img);
       }
       return mediaItem;
     }
 
-    async function getOrientation(fileObj) {
-      if (!fileObj?.url) return 'horizontal';
-      if (orientationCache.has(fileObj.id)) {
-        return orientationCache.get(fileObj.id);
-      }
-      try {
-        const url = new URL(fileObj.url);
-        url.searchParams.set('w', '100');
-        url.searchParams.set('h', '100');
-        const orientation = await new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve(img.naturalHeight > img.naturalWidth ? 'vertical' : 'horizontal');
-          img.onerror = () => resolve('horizontal');
-          img.src = url.toString();
-        });
-        orientationCache.set(fileObj.id, orientation);
-        return orientation;
-      } catch {
-        return 'horizontal';
-      }
+    function fadeToBlack(callback) {
+      const overlay = document.getElementById('blackOverlay');
+      overlay.style.opacity = "1";
+      setTimeout(() => {
+        callback();
+        overlay.style.opacity = "0";
+      }, 1000);
     }
 
-    // Función modificada para realizar crossfade entre elementos
-    async function playNext() {
+    function playNext() {
       if (!mediaFiles.length || !isPlaying) return;
       const fileObj = mediaFiles[currentIndex];
       if (!fileObj) {
         currentIndex = (currentIndex + 1) % mediaFiles.length;
         return;
       }
-      // Si se usa la lógica para vertical pair, se mantiene; aquí se omite para simplificar
-      const mediaElement = createMediaElement(fileObj);
-      const container = document.getElementById('mediaContainer');
-
-      // Si hay un elemento previo, se desvanece
-      if (container.firstChild) {
-        const oldElement = container.firstChild;
-        oldElement.style.transition = "opacity 500ms ease-in-out";
-        oldElement.style.opacity = "0";
-        setTimeout(() => {
-          if (container.contains(oldElement)) {
-            container.removeChild(oldElement);
-          }
-        }, 500);
-      }
-
-      // Prepara el nuevo elemento: fuerza opacidad 0 y luego activa la transición
-      mediaElement.style.opacity = "0";
-      container.appendChild(mediaElement);
-      // Forzamos el reflow para que se reconozca el cambio de opacidad
-      void mediaElement.offsetWidth;
-      mediaElement.classList.add('active');  // Esto activa la transición a opacidad 1
-
-      // Determinar el tiempo de visualización
-      const videoElem = mediaElement.querySelector('video');
-      const displayTime = videoElem ? (videoElem.duration * 1000 || 8000) : 8000;
-      setTimeout(() => {
-        currentIndex = (currentIndex + 1) % mediaFiles.length;
-        playNext();
-      }, displayTime);
-    }
-
-    function createVerticalPair(fileObj1, fileObj2) {
-      // Si usas el modo par vertical, mantén tu lógica. Se omite aquí para centrar la solución en el crossfade.
-      const pairContainer = document.createElement('div');
-      pairContainer.className = 'vertical-pair';
-      const item1 = createMediaElement(fileObj1);
-      const item2 = createMediaElement(fileObj2);
-      pairContainer.appendChild(item1);
-      pairContainer.appendChild(item2);
-      return pairContainer;
-    }
-
-    function setupLiveUpdates() {
-      window.addEventListener('storage', (event) => {
-        if (event.key === 'selectedPhotos') {
-          orientationCache.clear();
-          fetchSelectedPhotos();
-          if (!isPlaying) {
-            currentIndex = 0;
-            playNext();
-          }
+      
+      fadeToBlack(() => {
+        const mediaElement = createMediaElement(fileObj);
+        const container = document.getElementById('mediaContainer');
+        
+        if (container.firstChild) {
+          const oldElement = container.firstChild;
+          container.removeChild(oldElement);
         }
+        
+        container.appendChild(mediaElement);
+        mediaElement.classList.add('active');
+        
+        const videoElem = mediaElement.querySelector('video');
+        const displayTime = videoElem ? (videoElem.duration * 1000 || 8000) : 8000;
+        
+        setTimeout(() => {
+          currentIndex = (currentIndex + 1) % mediaFiles.length;
+          playNext();
+        }, displayTime);
       });
     }
 
-    function updateClock() {
-      const now = new Date();
-      const timeOptions = { hour: '2-digit', minute: '2-digit' };
-      const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-      document.querySelector('#clock .time').textContent = now.toLocaleTimeString('es-ES', timeOptions);
-      document.querySelector('#clock .date').textContent = now.toLocaleDateString('es-ES', dateOptions);
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.error('Error al activar pantalla completa:', err);
+        });
+      } else {
+        document.exitFullscreen();
+      }
     }
 
     window.onload = () => {
       fetchSelectedPhotos();
-      setupLiveUpdates();
-      updateClock();
-      setInterval(updateClock, 1000);
-      document.addEventListener('dblclick', () => {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen();
-        }
-      });
       playNext();
+      document.addEventListener('dblclick', toggleFullScreen);
     };
-
-    window.addEventListener('error', (error) => {
-      console.error('Error global:', error);
-      isPlaying = false;
-      setTimeout(() => {
-        isPlaying = true;
-        playNext();
-      }, 5000);
-    });
   </script>
 </body>
 </html>
