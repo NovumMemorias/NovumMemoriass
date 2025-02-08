@@ -19,8 +19,8 @@
       position: fixed;
       top: 10px;
       left: 10px;
-      background: #007bff;
-      color: white;
+      background: none;
+      color: rgb(40, 40, 40);
       border: none;
       border-radius: 5px;
       padding: 10px;
@@ -85,6 +85,7 @@
       background: none;
       box-shadow: none;
       padding: 10px;
+      white-space: nowrap; /* Evita que el texto se divida en dos líneas */
     }
     .fixed-header .button {
       padding: 10px 20px;
@@ -232,7 +233,7 @@
       z-index: 6500;
       display: none;
       flex-direction: column;
-      padding: 20px;
+      padding: 5%; /* Ajusta el valor según necesites */
       overflow-y: auto;
     }
     #manageOverlay h2 {
@@ -243,6 +244,8 @@
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       gap: 10px;
+      padding-right: 5%; /* Ajusta esto si el contenido se ve desbalanceado */
+
     }
     #manageOverlay .grid img {
       width: 100%;
@@ -252,15 +255,17 @@
       position: relative;
     }
     #manageOverlay .closeButton {
-      align-self: center;
-      margin-top: 20px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 10px;
-      background: #dc3545;
-      color: white;
-      cursor: pointer;
-    }
+  position: absolute;
+  top: 10px; /* Ajusta la distancia desde la parte superior */
+  right: 15%; /* Ajusta la distancia desde la derecha */
+  background: #dc3545; /* Rojo */
+  border: none;
+  padding: 10px 15px;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+  z-index: 10; /* Asegura que esté encima de otros elementos */
+}
     .deleteIcon {
       position: absolute;
       top: 5px;
