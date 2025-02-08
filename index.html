@@ -4,11 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Google Photos App - Configuración</title>
-  <!-- Carga de las librerías de Google API -->
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    /* (Se mantienen los estilos originales, sin cambios relevantes) */
+    /* Estilos originales */
     body {
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
@@ -24,7 +23,7 @@
       padding: 15px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       z-index: 1000;
-      display: none;
+      display: flex;  /* Se muestra como flex para alinear correctamente */
       flex-wrap: wrap;
       gap: 10px;
       align-items: center;
@@ -41,14 +40,26 @@
       background: #ffc107;
       color: black;
     }
+    /* La antigua barra de progreso se oculta (ya no se usará) */
     #progressBar {
-      height: 5px;
-      background: #007bff;
-      width: 0%;
-      transition: width 0.3s;
-      flex-grow: 1;
-      margin-top: 10px;
+      display: none;
     }
+    /* Nueva rueda de carga (loader) */
+    .loader {
+      display: none;
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-top: 4px solid #007bff;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin-left: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* Resto de estilos originales */
     #photosContainer {
       margin-top: 120px;
       display: grid;
@@ -202,68 +213,76 @@
   </style>
 </head>
 <body>
-
   <!-- Pantalla de bienvenida -->
   <div id="welcomeOverlay">
     <h1>Bienvenidos</h1>
-    <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder a tu galería. Toca el botón para iniciar la autenticación.</p>
-    <button class="welcomeButton" id="btnIniciar">Toca para comenzar</button>
+    <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder 
+      a tu galería. Toca el botón para iniciar la autenticación.</p>
+    <button class="welcomeButton" id="btnIniciar">Toca para 
+      comenzar</button>
   </div>
-
+  
   <!-- Interfaz de administración -->
   <div class="fixed-header" id="header">
     <button class="button" id="authButton">Reautenticar</button>
-    <button class="button" id="selectPhotosButton" disabled>Mostrar Fotos</button>
-    <button class="button" id="saveSelectionButton" disabled>Guardar selección</button>
-    <button class="button" id="manageReproductionButton" disabled>Gestionar reproducción</button>
+    <button class="button" id="selectPhotosButton" disabled>Mostrar 
+      Fotos</button>
+    <button class="button" id="saveSelectionButton" disabled>Guardar 
+      selección</button>
+    <button class="button" id="manageReproductionButton" 
+      disabled>Gestionar reproducción</button>
     <div id="progressBar"></div>
+    <!-- Aquí se encuentra la rueda de carga -->
+    <div class="loader" id="loader"></div>
   </div>
-
+  
   <div id="photosContainer"></div>
   <div id="message"></div>
-
+  
   <!-- Overlay de elección de modo de uso -->
   <div id="usageScreen">
     <h2>¿Cómo se usará este dispositivo?</h2>
-    <button class="usageButton" id="btnAdministrar">Administrar fotos y videos</button>
-    <button class="usageButton secondary" id="btnMarco">Usar como marco de fotos</button>
+    <button class="usageButton" id="btnAdministrar">Administrar fotos y 
+      videos</button>
+    <button class="usageButton secondary" id="btnMarco">Usar como marco 
+      de fotos</button>
   </div>
-
+  
   <!-- Overlay para gestionar reproducción -->
   <div id="manageOverlay">
     <h2>Gestionar reproducción</h2>
     <div class="grid" id="manageGrid"></div>
     <button class="closeButton" id="closeManageOverlay">Cerrar</button>
   </div>
-
+  
   <script>
-    // Función para mostrar mensajes
+    // Función para mostrar mensajes 
     function showMessage(text) {
       console.log("Mensaje:", text);
       const messageDiv = document.getElementById('message');
       messageDiv.textContent = text;
       setTimeout(() => messageDiv.textContent = '', 5000);
     }
-
-    // Configuración de la app
+    
+    // Configuración de la app 
     const config = {
       CLIENT_ID: '398620721557-cc1g475hejmglorrf7v2aa61c4btod9g.apps.googleusercontent.com',
       API_KEY: 'AIzaSyCcgAXaMxPnwPjqbWYpWFvDtfohrE6fRHI',
       SCOPES: 'https://www.googleapis.com/auth/photoslibrary.readonly'
     };
-
+    
     let tokenClient;
     let accessToken = null;
     let selectedPhotos = new Set();
     let allFetchedPhotos = [];
-
-    // Función para obtener la selección ya guardada
+    
+    // Función para obtener la selección ya guardada 
     function getStoredSelection() {
       const stored = localStorage.getItem('selectedPhotos');
       return stored ? JSON.parse(stored) : [];
     }
-
-    // Inicializa GAPI
+    
+    // Inicializa GAPI 
     async function gapiLoaded() {
       try {
         await new Promise((resolve, reject) => {
@@ -283,8 +302,8 @@
         showMessage(`Error técnico: ${error.message}`);
       }
     }
-
-    // Inicializa el cliente OAuth2
+    
+    // Inicializa el cliente OAuth2 
     function gisLoaded() {
       tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: config.CLIENT_ID,
@@ -312,8 +331,8 @@
         }
       });
     }
-
-    // Función para iniciar autenticación
+    
+    // Función para iniciar autenticación 
     function iniciarAutenticacion() {
       if (!tokenClient) {
         showMessage('Sistema no inicializado. Recarga la página.');
@@ -321,8 +340,8 @@
       }
       tokenClient.requestAccessToken({ prompt: 'select_account' });
     }
-
-    // Muestra el overlay de elección de modo de uso
+    
+    // Muestra el overlay de elección de modo de uso 
     function showUsageScreen() {
       console.log("Mostrando pantalla de uso");
       const usageScreen = document.getElementById('usageScreen');
@@ -337,20 +356,21 @@
         window.location.href = 'clienteb.html';
       };
     }
-
-    // Función para obtener fotos desde Google Photos
+    
+    // Función para obtener fotos desde Google Photos 
     async function fetchPhotos() {
       if (!accessToken) {
         showMessage('No hay token de acceso. Autentícate primero.');
         return;
       }
-      const progressBar = document.getElementById('progressBar');
+      const loader = document.getElementById('loader');
       const container = document.getElementById('photosContainer');
       const button = document.getElementById('selectPhotosButton');
       try {
         button.disabled = true;
         container.innerHTML = '';
-        progressBar.style.width = '0%';
+        // Se muestra la rueda de carga
+        loader.style.display = 'inline-block';
         let photos = [];
         let nextPageToken = null;
         let pageCount = 0;
@@ -369,11 +389,11 @@
           photos = photos.concat(data.mediaItems || []);
           nextPageToken = data.nextPageToken;
           pageCount++;
-          progressBar.style.width = `${Math.min(pageCount * 10, 95)}%`;
         } while (nextPageToken && pageCount < 10);
-        progressBar.style.width = '100%';
+        // Oculta la rueda de carga al finalizar la carga
+        loader.style.display = 'none';
         allFetchedPhotos = photos;
-        // Filtra los ítems ya almacenados
+        // Filtra los ítems ya almacenados 
         const stored = getStoredSelection();
         const selectedIds = new Set(stored.map(item => item.id));
         const available = photos.filter(photo => !selectedIds.has(photo.id));
@@ -381,13 +401,13 @@
       } catch (error) {
         console.error('Error al cargar fotos:', error);
         showMessage('Error al cargar fotos. Intente nuevamente.');
+        loader.style.display = 'none';
       } finally {
         button.disabled = false;
-        setTimeout(() => progressBar.style.width = '0%', 1000);
       }
     }
-
-    // Muestra las fotos en pantalla
+    
+    // Muestra las fotos en pantalla 
     function displayPhotos(photos) {
       const container = document.getElementById('photosContainer');
       container.innerHTML = '';
@@ -410,8 +430,8 @@
         container.appendChild(img);
       });
     }
-
-    // Alterna la selección de una foto
+    
+    // Alterna la selección de una foto 
     function toggleSelection(img, photoId) {
       const isSelected = img.hasAttribute('selected');
       if (isSelected) {
@@ -423,8 +443,8 @@
       }
       document.getElementById('saveSelectionButton').disabled = selectedPhotos.size === 0;
     }
-
-    // Guarda la selección en localStorage y agrega la propiedad 'type'
+    
+    // Guarda la selección en localStorage y agrega la propiedad 'type' 
     function saveSelectedPhotos() {
       if (!allFetchedPhotos.length) {
         showMessage('No hay fotos cargadas para guardar.');
@@ -442,11 +462,11 @@
       }
       localStorage.setItem('selectedPhotos', JSON.stringify(selected));
       showMessage('Selección guardada. Puedes reproducirla en otro dispositivo.');
-      // Actualiza las miniaturas
+      // Actualiza las miniaturas 
       fetchPhotos();
     }
-
-    // Overlay para gestionar reproducción
+    
+    // Overlay para gestionar reproducción 
     function showManageOverlay() {
       const manageOverlay = document.getElementById('manageOverlay');
       const grid = document.getElementById('manageGrid');
@@ -475,8 +495,8 @@
       }
       manageOverlay.style.display = 'flex';
     }
-
-    // Elimina un medio de la reproducción
+    
+    // Elimina un medio de la reproducción 
     function removeFromReproduction(id) {
       let stored = getStoredSelection();
       stored = stored.filter(item => item.id !== id);
@@ -485,13 +505,13 @@
       showManageOverlay();
       fetchPhotos();
     }
-
+    
     function initManageButton() {
       const btnManage = document.getElementById('manageReproductionButton');
       btnManage.onclick = () => { showManageOverlay(); };
     }
-
-    // Inicialización de la página
+    
+    // Inicialización de la página 
     window.onload = async () => {
       document.getElementById('header').style.display = 'none';
       try {
