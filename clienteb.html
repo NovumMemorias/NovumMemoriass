@@ -7,6 +7,7 @@
   <!-- Se agrega Socket.IO -->
   <script src="/socket.io/socket.io.js"></script>
   <style>
+    /* Estilos generales */
     body, html {
       margin: 0;
       padding: 0;
@@ -26,6 +27,7 @@
       align-items: center;
       overflow: hidden;
     }
+    /* Clase original para medios individuales (no pares) */
     .mediaItem {
       position: absolute;
       width: 100%;
@@ -39,11 +41,39 @@
     .mediaItem.active {
       opacity: 1;
     }
-    .mediaItem img, .mediaItem video {
+    .mediaItem img,
+    .mediaItem video {
       object-fit: cover;
       width: 100%;
       height: 100%;
     }
+    /* Nueva clase para elementos en pares: sin posicionamiento absoluto */
+    .mediaItemPair {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      opacity: 0;
+      transition: opacity 1000ms ease-in-out;
+    }
+    .mediaItemPair.active {
+      opacity: 1;
+    }
+    .mediaItemPair img,
+    .mediaItemPair video {
+      object-fit: cover;
+      width: 100%;
+      height: 100%;
+    }
+    /* Contenedor para pares verticales */
+    .verticalPairContainer {
+      display: flex;
+      width: 100%;
+      height: 100%;
+    }
+    /* Overlay de transición a negro */
     #blackOverlay {
       position: fixed;
       top: 0;
@@ -73,12 +103,7 @@
     #clock .date {
       font-size: 24px;
     }
-    /* Estilos para vertical pairing */
-    .verticalPairContainer {
-      display: flex;
-      width: 100%;
-      height: 100%;
-    }
+    /* Animación para efecto slide up */
     @keyframes slideUp {
       from { transform: translateY(100%); opacity: 0; }
       to { transform: translateY(0); opacity: 1; }
@@ -104,13 +129,13 @@
     let isPlaying = true;
     const socket = io();
 
-    // Función que carga los medios guardados en localStorage
+    // Función para cargar los medios seleccionados desde localStorage
     function fetchSelectedPhotos() {
       try {
         const stored = localStorage.getItem('selectedPhotos');
         if (stored) {
           const parsed = JSON.parse(stored);
-          // Se espera que cada objeto tenga la propiedad "orientation"
+          // Se filtran los objetos válidos
           mediaFiles = parsed.filter(item => item?.id && item?.url && item.url.startsWith('http'));
           console.log('Medios cargados:', mediaFiles);
         }
@@ -119,12 +144,11 @@
       }
     }
 
-    // Función que crea un elemento de medio (imagen o video)
+    // Función para crear un elemento multimedia (imagen o video) para reproducción individual
     function createMediaElement(fileObj) {
       const mediaItem = document.createElement('div');
       mediaItem.className = 'mediaItem';
-      const isVideo = fileObj.type.includes('video') || fileObj.url.includes('=dv');
-      if (isVideo) {
+      if (fileObj.type.includes('video') || fileObj.url.includes('=dv')) {
         const video = document.createElement('video');
         video.src = fileObj.url;
         video.muted = true;
@@ -132,7 +156,6 @@
         video.autoplay = true;
         video.controls = false;
         video.style.objectFit = 'cover';
-        // Cuando el video carga y empieza a reproducirse, se hace visible el elemento
         video.addEventListener('loadeddata', () => {
           mediaItem.classList.add('active');
           video.play().catch(e => console.error('Error en video:', e));
@@ -147,15 +170,41 @@
       return mediaItem;
     }
 
-    // Función que crea un contenedor para dos medios verticales
+    // Función para crear un elemento multimedia para pares (usa la clase mediaItemPair)
+    function createMediaElementPair(fileObj) {
+      const mediaItem = document.createElement('div');
+      mediaItem.className = 'mediaItemPair';
+      if (fileObj.type.includes('video') || fileObj.url.includes('=dv')) {
+        const video = document.createElement('video');
+        video.src = fileObj.url;
+        video.muted = true;
+        video.playsInline = true;
+        video.autoplay = true;
+        video.controls = false;
+        video.style.objectFit = 'cover';
+        video.addEventListener('loadeddata', () => {
+          mediaItem.classList.add('active');
+          video.play().catch(e => console.error('Error en video:', e));
+        });
+        mediaItem.appendChild(video);
+      } else {
+        const img = new Image();
+        img.src = fileObj.url;
+        img.onload = () => mediaItem.classList.add('active');
+        mediaItem.appendChild(img);
+      }
+      return mediaItem;
+    }
+
+    // Función para crear el contenedor de un par vertical
     function createVerticalPairElement(fileObj1, fileObj2) {
       const container = document.createElement('div');
       container.className = 'verticalPairContainer slideUpAnimation';
       
-      const media1 = createMediaElement(fileObj1);
-      const media2 = createMediaElement(fileObj2);
+      const media1 = createMediaElementPair(fileObj1);
+      const media2 = createMediaElementPair(fileObj2);
       
-      // Cada medio ocupa el 50% del ancho del contenedor
+      // Cada elemento ocupa el 50% del ancho del contenedor
       media1.style.width = '50%';
       media2.style.width = '50%';
       
@@ -164,7 +213,7 @@
       return container;
     }
 
-    // Función que realiza la transición a negro antes de cambiar de medio
+    // Función para realizar la transición a negro antes de cambiar el contenido
     function fadeToBlack(callback) {
       const overlay = document.getElementById('blackOverlay');
       overlay.style.opacity = "1";
@@ -174,29 +223,22 @@
       }, 1000);
     }
 
-    // Función auxiliar para esperar a que terminen de reproducirse los videos en el contenedor.
-    // Se calcula un tiempo de seguridad basado en la duración máxima de los videos (si se conoce)
+    // Función para esperar a que terminen los videos o usar un timeout fijo
     function waitForVideosToEnd(container, callback) {
       const videos = container.querySelectorAll('video');
       if (videos.length === 0) {
-        // Si no hay videos, usamos un timeout fijo (por ejemplo, 8000 ms)
         setTimeout(callback, 8000);
         return;
       }
-      // Calculamos la duración máxima entre los videos (si están definidos)
       let maxDuration = 0;
       videos.forEach(video => {
         if (!isNaN(video.duration) && video.duration > maxDuration) {
           maxDuration = video.duration;
         }
       });
-      // Si no se pudo determinar la duración, usamos un fallback de 15000 ms
       const fallbackTime = maxDuration ? maxDuration * 1000 : 15000;
-      
       let endedCount = 0;
-      let fallbackTimer = setTimeout(() => {
-        callback();
-      }, fallbackTime);
+      let fallbackTimer = setTimeout(() => { callback(); }, fallbackTime);
       
       videos.forEach(video => {
         video.addEventListener('ended', function handler() {
@@ -211,44 +253,49 @@
     }
 
     // Función principal de reproducción
+    // Únicamente si el medio actual es vertical se buscará emparejarlo.
     function playNext() {
       if (!mediaFiles.length || !isPlaying) return;
       
       const container = document.getElementById('mediaContainer');
-      // Seleccionamos el medio actual
       const currentMedia = mediaFiles[currentIndex];
       
-      // Si el medio es vertical se busca emparejarlo
+      // Si el medio es vertical, se empareja con otro vertical (o se duplica si no hay pareja)
       if (currentMedia.orientation === 'vertical') {
-        // Calculamos el índice del siguiente medio (usando módulo)
-        const nextIndex = (currentIndex + 1) % mediaFiles.length;
-        const partnerMedia = mediaFiles[nextIndex];
-        // Si el siguiente medio es vertical, se usa; de lo contrario se duplica el actual
-        const finalPartner = (partnerMedia && partnerMedia.orientation === 'vertical')
-                             ? partnerMedia
-                             : currentMedia;
-        // Avanzamos dos posiciones si se encontró compañero; de lo contrario, avanzamos una
-        currentIndex = (partnerMedia && partnerMedia.orientation === 'vertical')
-                       ? (currentIndex + 2) % mediaFiles.length
-                       : (currentIndex + 1) % mediaFiles.length;
+        let partnerIndex = -1;
+        // Recorrer la lista (wrap-around) en busca de otro vertical distinto
+        for (let i = currentIndex + 1; i < currentIndex + mediaFiles.length; i++) {
+          const idx = i % mediaFiles.length;
+          if (mediaFiles[idx].orientation === 'vertical' && idx !== currentIndex) {
+            partnerIndex = idx;
+            break;
+          }
+        }
+        
+        let partnerMedia;
+        if (partnerIndex !== -1) {
+          partnerMedia = mediaFiles[partnerIndex];
+          currentIndex = (partnerIndex + 1) % mediaFiles.length;
+        } else {
+          // Si no se encuentra compañero, se duplica el actual
+          partnerMedia = currentMedia;
+          currentIndex = (currentIndex + 1) % mediaFiles.length;
+        }
         
         fadeToBlack(() => {
-          const verticalPairElement = createVerticalPairElement(currentMedia, finalPartner);
+          const pairElement = createVerticalPairElement(currentMedia, partnerMedia);
           container.innerHTML = '';
-          container.appendChild(verticalPairElement);
-          // Espera a que los videos (si hubiera) terminen o, en su defecto, usa el fallback
+          container.appendChild(pairElement);
           waitForVideosToEnd(container, playNext);
         });
+        
       } else {
-        // Para medios horizontales o de otra orientación
+        // Si el medio NO es vertical, se muestra individualmente
         fadeToBlack(() => {
           const mediaElement = createMediaElement(currentMedia);
           container.innerHTML = '';
           container.appendChild(mediaElement);
-          // Si el medio es un video, esperamos a que termine; si es imagen, usamos un timeout fijo.
           waitForVideosToEnd(container, playNext);
-          // Si no hay video, el waitForVideosToEnd usará un timeout de 8000 ms.
-          // Actualizamos el índice para pasar al siguiente medio.
           currentIndex = (currentIndex + 1) % mediaFiles.length;
         });
       }
@@ -263,7 +310,7 @@
       document.querySelector('#clock .date').textContent = now.toLocaleDateString('es-ES', dateOptions);
     }
 
-    // Sincroniza cambios en localStorage cada 5 segundos
+    // Sincronización periódica con localStorage (cada 5 segundos)
     setInterval(() => {
       const stored = localStorage.getItem('selectedPhotos');
       if (stored) {
@@ -277,7 +324,7 @@
       }
     }, 5000);
 
-    // Escucha cambios en localStorage para sincronizar entre pestañas
+    // Sincronización entre pestañas (escucha el evento storage)
     window.addEventListener('storage', (event) => {
       if (event.key === 'selectedPhotos') {
         console.log("Cambio detectado en localStorage, actualizando...");
@@ -287,7 +334,7 @@
       }
     });
 
-    // Notificaciones vía WebSockets para actualizaciones en tiempo real
+    // Notificaciones vía WebSockets
     socket.on('refreshPhotos', () => {
       console.log("Nuevos archivos detectados desde WebSockets, actualizando...");
       fetchSelectedPhotos();
@@ -295,7 +342,7 @@
       playNext();
     });
 
-    // Asigna el evento window.onload una vez definidas todas las funciones
+    // Inicialización al cargar la ventana
     window.onload = function() {
       fetchSelectedPhotos();
       playNext();
@@ -304,7 +351,7 @@
       document.addEventListener('dblclick', toggleFullScreen);
     };
 
-    // Función para activar/desactivar pantalla completa
+    // Función para activar o desactivar pantalla completa
     function toggleFullScreen() {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => {
