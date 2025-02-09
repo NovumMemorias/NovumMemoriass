@@ -286,67 +286,56 @@
 <body>
   <!-- Botón para abrir el menú (hamburguesa) -->
   <div id="menuToggle">☰</div>
-  
   <!-- Overlay del menú -->
   <div id="menuOverlay">
     <div class="menuContainer">
       <button class="closeButton" id="menuCloseButton">Cerrar</button>
       <!-- Botón Reautenticar (tamaño normal) -->
       <button id="authButtonOverlay">Reautenticar</button>
-      <!-- Se elimina la palabra "Menú" -->
       <h2>Acerca de</h2>
       <p>
-        Me llamo Nestor y estoy desarrollando esta idea hace un tiempo 
-        con ayuda de la IA para generar un marco de fotos digital que se pueda 
-        gestionar desde un celular. Lo que motivó esto es la pérdida de un ser 
-        querido y el querer recordarlo o tenerlo presente para que el tiempo no 
-        lo diluya. Tuve esta idea para llenar el vacío que dejan esos seres que 
-        ya no están con nosotros. Espero que lo disfruten como yo lo disfruto 
-        este camino totalmente nuevo y lleno de aprendizaje. Todos los derechos 
-        reservados 2025.
+        Me llamo Nestor y estoy desarrollando esta idea hace un tiempo
+        con ayuda de la IA para generar un marco de fotos digital que
+        se pueda gestionar desde un celular. Lo que motivó esto es la pérdida de
+        un ser querido y el querer recordarlo o tenerlo presente para que el
+        tiempo no lo diluya. Tuve esta idea para llenar el vacío que dejan esos
+        seres que ya no están con nosotros. Espero que lo disfruten como yo lo
+        disfruto este camino totalmente nuevo y lleno de aprendizaje. Todos los
+        derechos reservados 2025.
       </p>
     </div>
   </div>
-  
   <!-- Pantalla de bienvenida -->
   <div id="welcomeOverlay">
     <h1>Bienvenidos</h1>
-    <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder 
-    a tu galería. Toca el botón para iniciar la autenticación.</p>
+    <p>Para comenzar, otorga permiso a tu cuenta de Google para acceder a tu galería. Toca el botón para iniciar la autenticación.</p>
     <button class="welcomeButton" id="btnIniciar">Toca para comenzar</button>
   </div>
-  
   <!-- Cabecera: botones "Guardar selección" y "Gestionar reproducción" -->
   <div class="fixed-header" id="header">
     <button class="button" id="saveSelectionButton" disabled>Guardar selección</button>
     <button class="button" id="manageReproductionButton" disabled>Gestionar reproducción</button>
   </div>
-  
   <!-- Loader global (centrado en pantalla) -->
   <div class="loader" id="loader"></div>
-  
   <div id="photosContainer"></div>
-  
   <div id="message"></div>
-  
   <!-- Overlay de elección de modo de uso -->
   <div id="usageScreen">
     <h2>¿Cómo se usará este dispositivo?</h2>
     <button class="usageButton" id="btnAdministrar">Administrar fotos y videos</button>
     <button class="usageButton secondary" id="btnMarco">Usar como marco de fotos</button>
   </div>
-  
   <!-- Overlay para gestionar reproducción -->
   <div id="manageOverlay">
     <h2>Gestionar reproducción</h2>
     <div class="grid" id="manageGrid"></div>
     <button class="closeButton" id="closeManageOverlay">Cerrar</button>
   </div>
-  
   <script>
     // Se crea la instancia de Socket.IO
     const socket = io();
-
+    
     // Función para mostrar mensajes
     function showMessage(text) {
       console.log("Mensaje:", text);
@@ -402,7 +391,6 @@
         callback: (tokenResponse) => {
           if (tokenResponse?.access_token) {
             accessToken = tokenResponse.access_token;
-            // Habilitar botones de gestión
             document.getElementById('manageReproductionButton').disabled = false;
             showMessage('¡Autenticación exitosa!');
             document.getElementById('welcomeOverlay').style.display = 'none';
@@ -448,7 +436,6 @@
       document.getElementById('btnAdministrar').addEventListener('click', () => {
         console.log("Modo administrar seleccionado");
         usageScreen.style.display = 'none';
-        // Cargar automáticamente las fotos al seleccionar administrar
         fetchPhotos();
       });
       document.getElementById('btnMarco').addEventListener('click', () => {
@@ -539,18 +526,26 @@
       document.getElementById('saveSelectionButton').disabled = selectedPhotos.size === 0;
     }
     
-    // Guarda la selección en localStorage y agrega la propiedad 'type'
+    // Guarda la selección en localStorage y agrega la propiedad 'orientation'
     function saveSelectedPhotos() {
       if (!allFetchedPhotos.length) {
         showMessage('No hay fotos cargadas para guardar.');
         return;
       }
       const selected = allFetchedPhotos.filter(photo => selectedPhotos.has(photo.id))
-        .map(photo => ({
-          id: photo.id,
-          url: (photo.baseUrl || photo.url) + (photo.mimeType && photo.mimeType.includes('video') ? '=dv' : '=w1920-h1080'),
-          type: photo.mimeType || 'image'
-        }));
+        .map(photo => {
+          const width = photo.mediaMetadata ? parseInt(photo.mediaMetadata.width, 10) : 1920;
+          const height = photo.mediaMetadata ? parseInt(photo.mediaMetadata.height, 10) : 1080;
+          const orientation = height > width ? 'vertical' : 'horizontal';
+          return {
+            id: photo.id,
+            url: (photo.baseUrl || photo.url) + (photo.mimeType && photo.mimeType.includes('video') ? '=dv' : '=w1920-h1080'),
+            type: photo.mimeType || 'image',
+            width,
+            height,
+            orientation
+          }
+        });
       if (selected.length === 0) {
         showMessage('No se seleccionó ninguna foto.');
         return;
@@ -612,9 +607,7 @@
     
     // Asignación de event listeners cuando la página carga
     window.addEventListener('load', async () => {
-      // Ocultar cabecera inicialmente
       document.getElementById('header').style.display = 'none';
-      // Asignar event listeners
       document.getElementById('menuToggle').addEventListener('click', toggleMenuOverlay);
       document.getElementById('menuCloseButton').addEventListener('click', toggleMenuOverlay);
       document.getElementById('authButtonOverlay').addEventListener('click', iniciarAutenticacion);
@@ -632,7 +625,7 @@
         showMessage('Error crítico. Recarga la aplicación.');
       }
     });
-
+    
     // Verificación periódica de cambios en localStorage (cada 5 segundos)
     setInterval(() => {
       const stored = localStorage.getItem('selectedPhotos');
@@ -646,7 +639,7 @@
         }
       }
     }, 5000);
-
+    
     // Escuchar cambios en localStorage para sincronizar pestañas
     window.addEventListener('storage', (event) => {
       if (event.key === 'selectedPhotos') {
@@ -656,15 +649,15 @@
         playNext();
       }
     });
-
+    
     // Escuchar notificaciones vía WebSockets
     socket.on('refreshPhotos', () => {
       console.log("Nuevos archivos detectados desde WebSockets, actualizando...");
-      fetchSelectedPhotos();
+      fetchPhotos();
       currentIndex = 0;
       playNext();
     });
-
+    
     window.onload = () => {
       fetchSelectedPhotos();
       playNext();
@@ -672,7 +665,7 @@
       setInterval(updateClock, 1000);
       document.addEventListener('dblclick', toggleFullScreen);
     };
-
+    
     function updateClock() {
       const now = new Date();
       const timeOptions = { hour: '2-digit', minute: '2-digit' };
@@ -680,7 +673,7 @@
       document.querySelector('#clock .time').textContent = now.toLocaleTimeString('es-ES', timeOptions);
       document.querySelector('#clock .date').textContent = now.toLocaleDateString('es-ES', dateOptions);
     }
-
+    
     function toggleFullScreen() {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => {
